@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-Created on Thu Feb 28 09:34:44 2019
+Created on Tue Apr 16, 2019
 
 @author: Jesse Lusa
 """
@@ -9,6 +9,8 @@ from computeFV import computeFV
 import numpy as np
 from scipy.stats import norm
 import matplotlib.pyplot as plt
+
+np.random.seed(1)
 
 SPY = np.array([[2018, 2746.21, 2695.81, 2930.75, 2351.10, 2506.85, -6.24],\
                 [2017, 2449.08, 2257.83, 2690.16, 2257.83, 2673.61, 19.42],\
@@ -53,41 +55,61 @@ plt.plot(x, y)
 plt.close()
 
 # Variables
-investHorizon = 240 # months
-monthlyContr = 1250.0 # dollars
+investHorizon = 12 * 30 # months
+monthlyContr = 100.0 # dollars
 compoundFreq = 12 # (1) montlhly, (12) annually
-nTrials = 500
+nTrials = int(100000)
 
 # Model
 totContr = investHorizon * monthlyContr
-percentStocks = np.linspace(0, 1, 101)
-percentAlly = 1 - percentStocks
 roiStocks = np.sort(roiSPY)
-roiAlly = 0.022
-monthlyStocks = monthlyContr * percentStocks
-monthlyAlly = monthlyContr * percentAlly
 
 n = 12
 t = int(np.floor(investHorizon / 12))
-PMT = np.column_stack((monthlyAlly, monthlyStocks))
+PMT = monthlyContr
 
-allFV = np.zeros((len(percentStocks), nTrials))
+FV = np.zeros((t, nTrials))
+returns = np.zeros(np.shape(FV))
 for nIdx in range(nTrials):
-    FV = np.zeros((len(percentStocks), 2))
-    for pIdx in range(len(percentStocks)):
-        tFV = np.zeros((t, 2))
-        P = np.array([0.0, 0.0])
-        for tIdx in range(t):
-            tmpFV = np.array([0.0, 0.0])
-            for ii in range(2):
-                r = roiAlly;                
-                if ii != 0:
-                    r = np.random.normal(muSPY, stdSPY)
-                if r !=0.0:
-                    tmpFV[ii] = computeFV(P[ii], PMT[pIdx, ii], compoundFreq, r, 1)
-                else:
-                    tmpFV[ii] = PMT[pIdx, ii]
-            P = tmpFV
-            tFV[tIdx, :] = P
-        FV[pIdx, :] = tFV[-1, :]
-    allFV[:, nIdx] = np.sum(FV, axis = 1)
+    P = 0.0
+    tFV = np.zeros((t, 1))
+    tReturns = np.zeros(np.shape(tFV))
+    for tIdx in range(t):
+        r = np.random.normal(muSPY, stdSPY)
+        if r !=0.0:
+            tmpFV = computeFV(P, PMT, compoundFreq, r, 1)
+        else:
+            tmpFV = tmpFV
+        P = tmpFV
+        tFV[tIdx, 0] = P
+        tReturns[tIdx, 0] = r
+    FV[:, nIdx] = tFV[:, 0]
+    returns[:, nIdx] = tReturns[:, 0]
+    
+# Stats
+twenty = FV[19, :]
+twenty_five = FV[24, :]
+thirty = FV[-1, :]
+mu20, std20 = norm.fit(twenty)
+mu25, std25 = norm.fit(twenty_five)
+mu30, std30 = norm.fit(thirty)
+
+fig, ax = plt.subplots(figsize = (16, 10))
+n, bins, patches = ax.hist(twenty, bins = 100, density=True, histtype='step',
+                           cumulative=-1, label='Twenty Years')
+n, bins, patches = ax.hist(twenty_five, bins = 100, density=True, histtype='step',
+                           cumulative=-1, label='Twenty Five Years')
+n, bins, patches = ax.hist(thirty, bins = 100, density=True, histtype='step',
+                           cumulative=-1, label='Thirty Years')
+# tidy up the figure
+ax.grid(True)
+ax.legend(loc='right')
+ax.set_title('Cumulative Step Histograms')
+ax.set_xlabel('Future Value (USD)')
+ax.set_ylabel('Likelihood of Occurrence')
+
+#plt.hist(thirty_years, bins=100, normed=True)
+#xmin, xmax = plt.xlim()
+#x = np.linspace(xmin, xmax, 100)
+#y = norm.pdf(x, mu30, std30)
+#plt.plot(x, y)
