@@ -1,7 +1,6 @@
 # -*- coding: utf-8 -*-
 """
 Created on Thu Feb 28 09:34:44 2019
-
 @author: Jesse Lusa
 """
 
@@ -91,3 +90,13 @@ for nIdx in range(nTrials):
             tFV[tIdx, :] = P
         FV[pIdx, :] = tFV[-1, :]
     allFV[:, nIdx] = np.sum(FV, axis = 1)
+
+gains = allFV - totContr;
+ROI = gains / totContr;
+allyOnlyROI = np.mean(ROI[1, :]);
+
+sortedROI = np.sort(ROI[50, :])
+y = np.arange(1, len(sortedROI) + 1) / len(sortedROI)
+plt.plot(sortedROI, y)
+plt.margins(0.02)
+plt.close()

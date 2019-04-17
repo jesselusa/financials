@@ -1,7 +1,6 @@
 # -*- coding: utf-8 -*-
 """
 Created on Tue Apr 16, 2019
-
 @author: Jesse Lusa
 """
 
