@@ -4,15 +4,25 @@ Created on Tue Apr 16, 2019
 @author: Jesse Lusa
 """
 
-from computeFV import computeFV
 from tabulate import tabulate
 import numpy as np
 from scipy.stats import norm
 import matplotlib.pyplot as plt
+import matplotlib.ticker as tick
+
+def compute_FV(P, PMT, n, r, t):
+    # P: Principle
+    # PMT: Monthly contribution
+    # n: compounds per year
+    # r: annual interest rate
+    # t: number of years:
+    FV = P * ((1 + (r/n)) ** (n*t)) \
+         + PMT * ((((1 + (r/n)) ** (n*t)) - 1) / (r/n))
+    return FV
 
 np.random.seed(1)
 
-# Imported S&P Performance
+''' Imported SPY Performance '''
 SPY = np.array([[2018, 2746.21, 2695.81, 2930.75, 2351.10, 2506.85, -6.24],\
                 [2017, 2449.08, 2257.83, 2690.16, 2257.83, 2673.61, 19.42],\
                 [2016, 2094.65, 2012.66, 2271.72, 1829.08, 2238.83, 9.54],\
@@ -44,35 +54,37 @@ SPY = np.array([[2018, 2746.21, 2695.81, 2930.75, 2351.10, 2506.85, -6.24],\
                 [1990, 334.63 , 359.69, 368.95, 295.46, 330.22, -6.56],\
                 [1989, 323.05 , 275.31, 359.80, 275.31, 353.40, 27.25]])
 
-roiSPY = SPY[:, -1] / 100 
-P = 1
-for roi in roiSPY:
-    P = P * (1 + roi)
-avg_return = np.power(P, 1 / len(roiSPY)) - 1
+roi_SPY = SPY[:, -1] / 100 
 
-# Fit Normal Distribution to ROI data
-muSPY, stdSPY = norm.fit(roiSPY)
-#plt.hist(roiSPY, bins=15, density=True)
+''' Calulate the average performance of SPY over these 30 years '''
+P = 1
+for roi in roi_SPY:
+    P = P * (1 + roi)
+avg_return = np.power(P, 1 / len(roi_SPY)) - 1
+
+''' Fit Normal Distribution to ROI data '''
+mu_SPY, std_SPY = norm.fit(roi_SPY)
+#plt.hist(roi_SPY, bins=15, density=True)
 #xmin, xmax = plt.xlim()
 #x = np.linspace(xmin, xmax, 100)
-#y = norm.pdf(x, muSPY, stdSPY)
+#y = norm.pdf(x, mu_SPY, std_SPY)
 #plt.plot(x, y)
 #plt.close()
 
-# Variables
-investHorizon = 12 * 40 # months
-monthlyContr = 100.0 # dollars
-compoundFreq = 12 # (1) montlhly, (12) annually
-nTrials = int(100000)
+''' Variables '''
+invest_horizon = 12 * 40 # months
+monthly_contr = 100.0 # dollars
+compound_freq = 12 # (1) montlhly, (12) annually
+nTrials = 1000000 # number of Monte-Carlo trials
 
-# Future-Value Model
-totContr = investHorizon * monthlyContr
-roiStocks = np.sort(roiSPY)
+''' Future-Value Model '''
+tot_contr = invest_horizon * monthly_contr
 
 n = 12
-t = int(np.floor(investHorizon / 12))
-PMT = monthlyContr
+t = int(np.floor(invest_horizon / 12))
+PMT = monthly_contr
 
+nTrials = int(nTrials)
 FV = np.zeros((t, nTrials))
 returns = np.zeros(np.shape(FV))
 for nIdx in range(nTrials):
@@ -80,9 +92,9 @@ for nIdx in range(nTrials):
     tFV = np.zeros((t, 1))
     tReturns = np.zeros(np.shape(tFV))
     for tIdx in range(t):
-        r = np.random.normal(muSPY, stdSPY)
+        r = np.random.normal(mu_SPY, std_SPY)
         if r !=0.0:
-            tmpFV = computeFV(P, PMT, compoundFreq, r, 1)
+            tmpFV = compute_FV(P, PMT, compound_freq, r, 1)
         else:
             tmpFV = tmpFV
         P = tmpFV
@@ -91,8 +103,8 @@ for nIdx in range(nTrials):
     FV[:, nIdx] = tFV[:, 0]
     returns[:, nIdx] = tReturns[:, 0]
     
-# Analysis
-capital_expnd = np.linspace(monthlyContr * 12, totContr, t)
+''' Analysis '''
+capital_expnd = np.linspace(monthly_contr * 12, tot_contr, t)
 capital_expnd = np.array([capital_expnd,]*nTrials).transpose()
 total_roi = (FV - capital_expnd) / capital_expnd
 
@@ -101,42 +113,57 @@ years_of_interest = np.array([20, 30, 35, 40])
 stats_arr = np.zeros((len(years_of_interest), 7))
 stats_arr[:, 0] = np.transpose(years_of_interest)
 arr_headers = np.array(['Investment_Horizon', 'Capital Investment', 'Mean', 'Std',\
-                        '10th Percentile', '50th Percentile', '70th Percentile',])
+                        '10th Percentile', '50th Percentile', '90th Percentile',])
 
-# Plotting              
-fig, ax = plt.subplots(2, 1, figsize=(16, 10)) #figsize = (16, 10))
+''' Plotting '''     
+plt.figure(1, figsize=(16, 10))
+plt.rc('font', size=16)          # controls default text sizes
+plt.rc('axes', titlesize=24)
+plt.rc('axes', labelsize=20)
+ax1 = plt.gca()   
+plt.figure(2, figsize=(16, 10))
+ax2 = plt.gca()     
 for yIdx in range(len(years_of_interest)):
     year = years_of_interest[yIdx]
     idx = np.where(years == year)[0][0]
     FV_year = FV[idx, :]
     stats_arr[yIdx, 1:3] = norm.fit(FV_year)
-    stats_arr[yIdx, 3] = monthlyContr * investHorizon
+    stats_arr[yIdx, 3] = monthly_contr * invest_horizon
     stats_arr[yIdx, 4:7] = np.array([np.percentile(FV_year, 10),\
                                      np.percentile(FV_year, 50),\
-                                     np.percentile(FV_year, 75)])
-    ax[0].hist(FV_year, bins=int(nTrials/100), range=[0, 1.5e4 * monthlyContr], density=True, cumulative=-1,
+                                     np.percentile(FV_year, 90)])
+    nBins = lambda nTrials: int(nTrials / 100) if nTrials>10000 else int(nTrials / 10)
+    ax1.hist(FV_year, bins=nBins(nTrials), range=[0, 1.5e4 * monthly_contr], density=True, cumulative=-1,
             histtype = 'step', label='{0:d} Years'.format(year))
     roi_year =  total_roi[idx, :]
-    ax[1].hist(roi_year, bins=int(nTrials/100), range=[0, 65], density=True, cumulative=-1,
+    ax2.hist(roi_year, bins=nBins(nTrials), range=[0, 65], density=True, cumulative=-1,
             histtype = 'step', label='{0:d} Years'.format(year))
 
 print('\n')
 print(tabulate(stats_arr, headers=arr_headers))
-print('\n')
+print('\n\nDone\n...')
 
-ax[0].set_yticks(np.arange(0, 1.1, 0.10))
-ax[0].axis(xmin=0, ymin=0, ymax=1)
-ax[0].grid(True)
-ax[0].legend(loc='right')
-ax[0].set_title('Cumulative Density Function of Future Values, ${0:0.0f}/Month Deposit'.format(monthlyContr))
-ax[0].set_xlabel('Future Value (USD)')
-ax[0].set_ylabel('Probability of Occurrence')
+# Format Plots
+plt.figure(1)
+ax1.set_yticks(np.arange(0, 1.1, 0.10))
+ax1.axis(xmin=0, ymin=0, ymax=1)
+ax1.get_xaxis().set_major_formatter(tick.StrMethodFormatter('${x:,.0f}'))
+ax1.grid(True)
+ax1.legend(loc='right')
+ax1.set_title('CDF of Future Values, ${0:0.0f}/Month Deposit'.format(monthly_contr))
+ax1.set_xlabel('Future Value (USD)')
+ax1.set_ylabel('Probability of Occurrence')
+plt.savefig('fv_cdf.png', bbox_inches='tight')
+plt.close()
 
-ax[1].set_yticks(np.arange(0, 1.1, 0.10))
-ax[1].set_xticks(np.arange(0, 75, 5))
-ax[1].axis(xmin=0, ymin=0, ymax=1)
-ax[1].grid(True)
-ax[1].legend(loc='right')
-ax[1].set_title('Cumulative Density Function of ROI, ${0:0.0f}/Month Deposit'.format(monthlyContr))
-ax[1].set_xlabel('Return on Investment')
-ax[1].set_ylabel('Probability of Occurrence')
+plt.figure(2)
+ax2.set_yticks(np.arange(0, 1.1, 0.10))
+ax2.set_xticks(np.arange(0, 75, 5))
+ax2.axis(xmin=0, ymin=0, ymax=1)
+ax2.grid(True)
+ax2.legend(loc='right')
+ax2.set_title('CDF of ROI, ${0:0.0f}/Month Deposit'.format(monthly_contr))
+ax2.set_xlabel('Return on Investment')
+ax2.set_ylabel('Probability of Occurrence')
+plt.savefig('roi_cdf.png', bbox_inches='tight')
+plt.close()
